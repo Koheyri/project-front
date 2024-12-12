@@ -1,11 +1,408 @@
-<html>
+<html xmlns="http://www.w3.org/1999/html">
 <head>
+
     <title>RPG</title>
-    <script src=https://code.jquery.com/jquery-3.6.0.min.js></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/luxon/3.4.3/luxon.min.js"></script>
+
     <link href="/css/my.css" rel="stylesheet">
 </head>
 <body>
 <h1>RPG admin panel</h1>
+<h2>Account list:</h2>
+<div id="dropdownlist">Count per page:</div>
 
+<table id="table" border="1">
+    <thead id="tHead">
+    <tr>
+        <th>#</th>
+        <th>Name</th>
+        <th>Title</th>
+        <th>Race</th>
+        <th>Profession</th>
+        <th>Level</th>
+        <th>Birthday</th>
+        <th>Banned</th>
+        <th>Edit</th>
+        <th>Delete</th>
+
+    </tr>
+    </thead>
+    <tbody id="tBody">
+
+    </tbody>
+</table>
+
+<div id="navigation">
+
+    Pages:
+    <!--        <button>1</button>-->
+
+</div>
+<hr>
+<h2>Create new account:</h2>
+<label>
+    Name
+    <input type="text" maxlength="12" id="newName"/><br/>
+    Title
+    <input type="text" maxlength="30" id="newTitle"/><br/>
+    Race
+    <select id="newRace"></select><br/>
+    Profession
+    <select id="newProfession"></select><br/>
+    Level
+    <input type="number" min="1" max="100" id="newLevel"/><br/>
+    Birthday
+    <input type="date" id="newBirthday"/><br/>
+    Banned
+    <select id="newBanned"></select><br/>
+</label>
+<button id="saveBtn">Save</button>
+<script>
+    let accountCount;
+    let pageNumber = 1;
+    let pageSize = 3;
+    let chosenOption;
+    let chooseBan = document
+
+    let banned = document.getElementById("newBanned");
+    let trueOption = document.createElement("option");
+    trueOption.value = "true";
+    trueOption.textContent = "true";
+    let falseOption = document.createElement("option");
+    falseOption.value = "false";
+    falseOption.textContent = "false";
+    banned.appendChild(falseOption);
+    banned.appendChild(trueOption);
+
+
+    const raceOptions = [
+        "HUMAN",
+        "DWARF",
+        "ELF",
+        "GIANT",
+        "ORC",
+        "TROLL",
+        "HOBBIT"
+    ];
+    let selectRace = document.getElementById("newRace")
+
+
+    raceOptions.forEach(optionText => {
+        let option = document.createElement("option");
+        option.value = optionText;
+        option.textContent = optionText;
+        selectRace.appendChild(option);
+    });
+    const profession = [
+        "WARRIOR",
+        "ROGUE",
+        "SORCERER",
+        "CLERIC",
+        "PALADIN",
+        "NAZGUL",
+        "WARLOCK",
+        "DRUID"
+    ]
+    let selectProfession = document.getElementById("newProfession")
+
+    profession.forEach(optionText => {
+        let option = document.createElement("option");
+        option.value = optionText;
+        option.textContent = optionText;
+        selectProfession.appendChild(option);
+    });
+
+    console.info(selectRace);
+
+
+    $.ajax({
+        type: "GET",
+        url: "/rest/players",
+        success: function () {
+            updateTable(0, 3)
+        }
+    });
+
+
+    $.ajax({
+        type: "GET",
+        url: "/rest/players/count",
+
+        success: function (msg) {
+            accountCount = msg;
+        }
+    });
+    let select = document.createElement("select");
+    let options = ["3", "5", "10", "20"];
+    for (let i = 0; i < options.length; i++) {
+        let option = document.createElement("option");
+        option.value = options[i];
+        option.textContent = options[i];
+        select.appendChild(option);
+    }
+    let dropdownlist = document.getElementById("dropdownlist");
+    dropdownlist.appendChild(select);
+
+    select.addEventListener("change", function () {
+        const selectedValue = select.value;
+        dropdownAction(selectedValue);
+    })
+
+    function dropdownAction(value) {
+        switch (value) {
+            case "3":
+                pageSize = 3
+                updateTable(0, pageSize)
+                break;
+            case "5":
+                pageSize = 5
+                updateTable(0, pageSize)
+                break;
+            case "10":
+                pageSize = 10
+                updateTable(0, pageSize)
+                break;
+            case "20":
+                pageSize = 20
+                updateTable(0, pageSize)
+                break;
+            default:
+                alert("default");
+        }
+    }
+
+    function updateNavigation(pageSize) {
+        const nav = document.getElementById("navigation")
+        let btnCount = Math.ceil(accountCount / pageSize)
+        if (nav.children.length != btnCount) {
+            nav.innerHTML = "";
+            let btnCount = Math.ceil(accountCount / pageSize)
+            for (let i = 0; i < btnCount; i++) {
+                let btn = document.createElement("button")
+                btn.textContent = i + 1;
+                btn.dataset.pageNumber = i;
+                // btn.classList.add("active");
+                btn.addEventListener("click", function () {
+                    Array.from(nav.children).forEach(button => button.classList.remove("active"));
+                    this.classList.add("active");
+                    pageNumber = i;
+                    updateTable(i, pageSize);
+                });
+                nav.appendChild(btn);
+            }
+        }
+
+    }
+
+    function updateTable(pageNumber, pageSize) {
+        const tab = document.getElementById("tBody");
+        tab.innerHTML = null;
+        $.ajax({
+            type: "GET",
+            url: `/rest/players?pageNumber=${pageNumber}&pageSize=${pageSize}`,
+            success: function (message) {
+                const tab = document.getElementById("tBody");
+                const {DateTime} = luxon;
+
+                for (let i = 0; i < message.length; i++) {
+
+                    let date = DateTime.fromMillis(message[i].birthday);
+                    let formattedDate = date.toFormat('M/d/yyyy');
+                    let row = document.createElement("tr");
+                    row.innerHTML = `<td>${message[i].id}</td>
+                                <td>${message[i].name}</td>
+                                <td>${message[i].title}</td>
+                                <td>${message[i].race}</td>
+                                <td>${message[i].profession}</td>
+                                <td>${message[i].level}</td>
+                                <td>${formattedDate}</td>
+                                <td>${message[i].banned}</td>
+                                <td><img src= "/img/edit.png" class="editImage"> </td>
+                                <td><img src = "/img/delete.png" class="deleteImage"</td>`;
+                    tab.appendChild(row);
+                }
+                updateNavigation(pageSize)
+            }
+        });
+
+
+    }
+
+    function deleteUser(id) {
+        $.ajax({
+            type: "DELETE",
+            url: `/rest/players/${id}`,
+            success: function () {
+                updateTable(pageNumber, pageSize)
+            }
+
+
+        });
+    }
+
+    document.getElementById("table").addEventListener("click", function (event) {
+        if (event.target && event.target.classList.contains("deleteImage")) {
+            const thisRow = event.target.closest("tr");
+            const thisId = thisRow.children.item(0).textContent;
+
+            deleteUser(thisId);
+        }
+    });
+    document.getElementById("table").addEventListener("click", function editUser(event) {
+        if (event.target && event.target.classList.contains("editImage")) {
+            let img = event.target;
+            let row = img.closest("tr");
+
+
+            if (img.src.includes("/img/save.png")) { // если картинка save
+                for (let i = 0; i < row.cells.length - 2; i++) {
+                    let cell = row.cells[i];
+                    let currentValue = cell.textContent;
+                    if (i !== 0 && i !== 5 && i !== 6) {
+
+                        let inputField = document.getElementById(`inputField${i}`);
+
+                        currentValue = inputField.value;
+                        inputField.innerHTML = "";
+                        cell.removeChild(inputField);
+                        cell.textContent = currentValue;
+
+                    }
+
+                }
+                img.src = "/img/edit.png";
+                let id = row.cells[0].textContent;
+                let data = getData(row);
+                console.info(JSON.stringify(data))
+                $.ajax({
+                    type: 'POST',
+                    url: `/rest/players/${id}`,
+                    contentType: 'application/json',
+                    data: JSON.stringify(data),
+                    success: function (response) {
+                        alert('Player edit successfully!');
+                    },
+                    error: function (error) {
+                        console.error('Error during request:', error);
+                        alert('Failed to edit player.');
+                    }
+                });
+                return;
+            }
+            if (img.src.includes("/img/edit.png")) { // если картинка редактирования
+                for (let i = 0; i < row.cells.length - 2; i++) {
+                    let cell = row.cells[i];
+                    let currentValue = cell.textContent;
+                    if (i !== 0 && i !== 5 && i !== 6 && i !== 3 && i !== 4) {
+
+                        let inputField = document.createElement("input");
+                        inputField.value = currentValue;
+                        cell.innerHTML = "";
+                        inputField.id = `inputField${i}`;
+                        cell.appendChild(inputField);
+                    } else if (i === 3) {
+                        const editRace = document.createElement("select");
+                        raceOptions.forEach(optionText => {
+                            const option = document.createElement("option");
+                            option.value = optionText;
+                            option.textContent = optionText;
+                            if (optionText === currentValue) {
+                                option.selected = true;
+                            }
+                            editRace.appendChild(option);
+                        });
+                        cell.innerHTML = "";
+                        cell.appendChild(editRace);
+
+                        editRace.id = `inputField${i}`;
+                    } else if (i === 4) {
+                        const editProfession = document.createElement("select");
+                        profession.forEach(optionText => {
+                            const option = document.createElement("option");
+                            option.value = optionText;
+                            option.textContent = optionText;
+                            if (optionText === currentValue) {
+                                option.selected = true;
+                            }
+                            editProfession.appendChild(option);
+                        });
+
+                        cell.innerHTML = "";
+                        cell.appendChild(editProfession);
+                        editProfession.id = `inputField${i}`;
+
+                    }
+
+                }
+                img.src = "/img/save.png";
+            }
+
+        }
+
+    });
+
+    function getData(row) {
+        let data = {
+            //  id : row.cells[0].textContent,
+            name: row.cells[1].textContent,
+            title: row.cells[2].textContent,
+            race: row.cells[3].textContent,
+            profession: row.cells[4].textContent,
+            //   level : row.cells[5].textContent,
+            //    birthday : row.cells[6].textContent,
+            banned: row.cells[7].textContent
+
+        }
+        return data;
+
+    }
+
+    document.getElementById("saveBtn").addEventListener("click", function () {
+        console.info(document.getElementById("newName").value);
+        let date = Date.parse(document.getElementById("newBirthday").value);
+        console.info(date)
+        let data = {
+
+            name: document.getElementById("newName").value,
+            title: document.getElementById("newTitle").value,
+            race: document.getElementById("newRace").value,
+            profession: document.getElementById("newProfession").value,
+            birthday: date,
+            banned: document.getElementById("newBanned").value,
+            level: document.getElementById("newLevel").value
+
+        }
+        console.info(data);
+        $.ajax({
+            type: 'POST',
+            url: `/rest/players`,
+            contentType: 'application/json',
+            data: JSON.stringify(data),
+            success: function (response) {
+                alert('Player create successfully!');
+                updateNavigation(pageSize);
+                updateTable(pageNumber, pageSize);
+                clearNew();
+            },
+            error: function (error) {
+                console.error('Error during request:', error);
+                alert('Failed to create player.');
+            }
+        });
+    });
+
+    function clearNew() {
+        document.getElementById("newName").value = "";
+        document.getElementById("newTitle").value = "";
+        document.getElementById("newRace").value = "";
+        document.getElementById("newProfession").value = "";
+        document.getElementById("newBirthday").value = "";
+        document.getElementById("newBanned").value = "false";
+        document.getElementById("newLevel").value = "";
+    }
+
+
+</script>
 </body>
 </html>
